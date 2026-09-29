@@ -17,12 +17,6 @@ export class VoteRejectedError extends Error {
   }
 }
 
-export interface Result {
-  totalVotes: number;
-  /** Poll의 Option 순서대로. */
-  options: { id: string; label: string; count: number }[];
-}
-
 /** Vote 하나를 기록한다. ADR-0001에 따라 Voter를 식별하는 정보는 받지도 저장하지도 않는다. */
 export async function castVote(db: Db, pollId: string, optionIds: string[]): Promise<void> {
   const poll = await getPoll(db, pollId);
@@ -43,21 +37,4 @@ export async function castVote(db: Db, pollId: string, optionIds: string[]): Pro
     [pollId, optionIds],
   );
   if (inserted.length === 0) throw new VoteRejectedError("poll-closed");
-}
-
-export async function getResult(db: Db, pollId: string): Promise<Result> {
-  const [{ total }] = await db.query<{ total: number }>(
-    `SELECT count(*)::int AS total FROM votes WHERE poll_id = $1`,
-    [pollId],
-  );
-  const options = await db.query<{ id: string; label: string; count: number }>(
-    `SELECT o.id::text AS id, o.label, count(s.vote_id)::int AS count
-     FROM options o
-     LEFT JOIN vote_selections s ON s.option_id = o.id
-     WHERE o.poll_id = $1
-     GROUP BY o.id
-     ORDER BY o.position`,
-    [pollId],
-  );
-  return { totalVotes: total, options };
 }

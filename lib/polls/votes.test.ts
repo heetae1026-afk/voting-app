@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/lib/db/db";
 import { createTestDb } from "@/lib/db/test-db";
 import { closePoll, createPoll, getPoll, type Poll } from "./polls";
-import { castVote, getResult, type VoteRejectionReason } from "./votes";
+import { getResult as viewResult } from "./results";
+import { castVote, type VoteRejectionReason } from "./votes";
 
 let db: Db;
 
@@ -19,6 +20,13 @@ async function pollWith(options: string[], selectionMode: "single" | "multiple" 
 /** castVote가 해당 사유의 VoteRejectedError로 거부되어야 함을 나타낸다. */
 const rejectedFor = (reason: VoteRejectionReason) => ({ name: "VoteRejectedError", reason });
 
+/** Operator 시점의 Result. 이 파일은 Vote 기록을 확인하는 데만 쓴다. */
+async function getResult(pollId: string) {
+  const view = await viewResult(db, pollId, "operator");
+  if (view?.visibility !== "visible") throw new Error("Operator는 항상 Result를 봐야 한다");
+  return view.result;
+}
+
 const optionId = (poll: Poll, label: string) => poll.options.find((o) => o.label === label)!.id;
 
 describe("castVote", () => {
@@ -27,11 +35,11 @@ describe("castVote", () => {
 
     await castVote(db, poll.id, [optionId(poll, "양평")]);
 
-    expect(await getResult(db, poll.id)).toEqual({
+    expect(await getResult(poll.id)).toEqual({
       totalVotes: 1,
       options: [
-        { id: optionId(poll, "가평"), label: "가평", count: 0 },
-        { id: optionId(poll, "양평"), label: "양평", count: 1 },
+        { id: optionId(poll, "가평"), label: "가평", count: 0, ratio: 0 },
+        { id: optionId(poll, "양평"), label: "양평", count: 1, ratio: 1 },
       ],
     });
   });
@@ -92,7 +100,7 @@ describe("castVote on a Closed Poll", () => {
     await closePoll(db, poll.id);
 
     await expect(castVote(db, poll.id, [optionId(poll, "가평")])).rejects.toMatchObject(rejectedFor("poll-closed"));
-    expect((await getResult(db, poll.id)).totalVotes).toBe(0);
+    expect((await getResult(poll.id)).totalVotes).toBe(0);
   });
 });
 
@@ -103,7 +111,7 @@ describe("getResult", () => {
     await castVote(db, poll.id, [optionId(poll, "김"), optionId(poll, "이")]);
     await castVote(db, poll.id, [optionId(poll, "김")]);
 
-    const result = await getResult(db, poll.id);
+    const result = await getResult(poll.id);
     expect(result.totalVotes).toBe(2);
     expect(result.options.map((o) => [o.label, o.count])).toEqual([
       ["김", 2],

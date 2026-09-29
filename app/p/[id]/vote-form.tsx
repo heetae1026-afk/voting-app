@@ -56,6 +56,7 @@ export function VoteForm({ poll }: { poll: Poll }) {
       <section role="status" className="flex flex-col gap-2 rounded-lg bg-green-50 p-4 dark:bg-green-950">
         <p className="font-medium">투표했습니다.</p>
         <p className="text-sm">고른 선택지: {selectedLabels.join(", ")}</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">결과는 투표가 마감된 뒤 이 링크에서 볼 수 있습니다.</p>
       </section>
     );
   }
@@ -63,7 +64,7 @@ export function VoteForm({ poll }: { poll: Poll }) {
   if (alreadyVoted) {
     return (
       <p role="status" className="rounded-lg bg-zinc-100 p-4 dark:bg-zinc-900">
-        이 브라우저에서는 이미 투표했습니다.
+        이 브라우저에서는 이미 투표했습니다. 결과는 투표가 마감된 뒤 이 링크에서 볼 수 있습니다.
       </p>
     );
   }
