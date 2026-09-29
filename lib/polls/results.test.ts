@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/lib/db/db";
 import { createTestDb } from "@/lib/db/test-db";
-import { closePoll, createPoll, getPoll, type Poll } from "./polls";
+import { closePoll } from "./polls";
+import { makePoll, optionId } from "./test-fixtures";
 import { getResult } from "./results";
 import { castVote } from "./votes";
 
@@ -11,23 +12,16 @@ beforeEach(async () => {
   db = await createTestDb();
 });
 
-async function pollWith(options: string[], selectionMode: "single" | "multiple" = "single", selectionLimit?: number) {
-  const { id } = await createPoll(db, { question: "테스트 질문", options, selectionMode, selectionLimit });
-  return (await getPoll(db, id)) as Poll;
-}
-
-const optionId = (poll: Poll, label: string) => poll.options.find((o) => o.label === label)!.id;
-
 describe("getResult", () => {
   test("Voter는 Open Poll의 Result를 볼 수 없다", async () => {
-    const poll = await pollWith(["가평", "양평"]);
+    const poll = await makePoll(db, { options: ["가평", "양평"] });
     await castVote(db, poll.id, [optionId(poll, "가평")]);
 
     expect(await getResult(db, poll.id, "voter")).toEqual({ visibility: "hidden" });
   });
 
   test("Poll이 Closed되면 Voter도 Option별 선택 수와 비율, 전체 Vote 수를 본다", async () => {
-    const poll = await pollWith(["김", "이", "박", "최"], "multiple", 2);
+    const poll = await makePoll(db, { options: ["김", "이", "박", "최"], selectionMode: "multiple", selectionLimit: 2 });
     await castVote(db, poll.id, [optionId(poll, "김"), optionId(poll, "이")]);
     await castVote(db, poll.id, [optionId(poll, "김")]);
     await castVote(db, poll.id, [optionId(poll, "김"), optionId(poll, "박")]);
@@ -56,7 +50,7 @@ describe("getResult", () => {
   });
 
   test("Operator는 Open Poll의 Result도 본다", async () => {
-    const poll = await pollWith(["가평", "양평"]);
+    const poll = await makePoll(db, { options: ["가평", "양평"] });
     await castVote(db, poll.id, [optionId(poll, "양평")]);
 
     const view = await getResult(db, poll.id, "operator");
@@ -65,7 +59,7 @@ describe("getResult", () => {
   });
 
   test("Vote가 없는 Poll의 Result는 모든 수와 비율이 0이다", async () => {
-    const poll = await pollWith(["가평", "양평"]);
+    const poll = await makePoll(db, { options: ["가평", "양평"] });
     await closePoll(db, poll.id);
 
     const view = await getResult(db, poll.id, "voter");

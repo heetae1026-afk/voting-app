@@ -1,0 +1,16 @@
+// 테스트 전용. Poll을 만드는 기본값을 한 곳에 모아, Poll 정의에 필수 항목이 늘어도 여기만 고치면 되게 한다.
+import type { Db } from "@/lib/db/db";
+import { createPoll, getPoll, type NewPoll, type Poll } from "./polls";
+
+/** 규칙에 맞는 Poll 정의. 테스트가 관심 있는 항목만 덮어쓴다. */
+export function newPoll(overrides: Partial<NewPoll> = {}): NewPoll {
+  return { question: "테스트 질문", options: ["가평", "양평"], selectionMode: "single", ...overrides };
+}
+
+/** Poll을 만들고, 만든 Poll을 읽어서 돌려준다. */
+export async function makePoll(db: Db, overrides: Partial<NewPoll> = {}): Promise<Poll> {
+  const { id } = await createPoll(db, newPoll(overrides));
+  return (await getPoll(db, id))!;
+}
+
+export const optionId = (poll: Poll, label: string) => poll.options.find((o) => o.label === label)!.id;
