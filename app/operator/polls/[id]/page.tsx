@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ResultTable } from "@/app/ui/result-table";
+import { requireOperator } from "@/lib/auth/operator";
 import { getDb } from "@/lib/db/neon";
 import { getPoll } from "@/lib/polls/polls";
 import { getResult } from "@/lib/polls/results";
@@ -12,8 +13,8 @@ import { ClosePollButton, RefreshButton } from "./poll-controls";
 export const metadata: Metadata = { title: "투표 관리" };
 
 export default async function OperatorPollPage(props: PageProps<"/operator/polls/[id]">) {
-  // TODO(Operator 인증 티켓): Operator 세션을 확인한다.
   const { id } = await props.params;
+  await requireOperator(`/operator/polls/${id}`);
   const db = getDb();
   const poll = await getPoll(db, id);
   if (!poll) notFound();

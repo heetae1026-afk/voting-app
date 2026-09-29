@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireOperator } from "@/lib/auth/operator";
 import { getDb } from "@/lib/db/neon";
 import { closePoll, createPoll, PollDefinitionError, type PollDefinitionReason } from "@/lib/polls/polls";
 
@@ -10,7 +11,7 @@ export interface CreatePollState {
 }
 
 export async function createPollAction(_prev: CreatePollState, formData: FormData): Promise<CreatePollState> {
-  // TODO(Operator 인증 티켓): 여기서 Operator 세션을 확인한다. 지금은 누구나 호출할 수 있다.
+  await requireOperator();
   const selectionMode = formData.get("selectionMode");
   if (selectionMode !== "single" && selectionMode !== "multiple") {
     return { error: "invalid-selection-mode" };
@@ -32,7 +33,7 @@ export async function createPollAction(_prev: CreatePollState, formData: FormDat
 }
 
 export async function closePollAction(pollId: string): Promise<void> {
-  // TODO(Operator 인증 티켓): 여기서 Operator 세션을 확인한다. 지금은 누구나 호출할 수 있다.
+  await requireOperator();
   await closePoll(getDb(), pollId);
   refresh();
 }
