@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/lib/db/db";
 import { createTestDb } from "@/lib/db/test-db";
 import { createPoll, getPoll, type PollDefinitionReason } from "./polls";
-import { newPoll } from "./test-fixtures";
+import { makePoll, makePollPastClosingTime, newPoll } from "./test-fixtures";
 
 let db: Db;
 
@@ -119,5 +119,15 @@ describe("createPoll: Closing time", () => {
 describe("getPoll", () => {
   test("없는 Poll ID면 null을 돌려준다", async () => {
     expect(await getPoll(db, "no-such-poll")).toBeNull();
+  });
+});
+
+describe("Open / Closed", () => {
+  test("Closing time 전의 Poll은 Open이다", async () => {
+    expect((await makePoll(db)).status).toBe("open");
+  });
+
+  test("Closing time이 지난 Poll은 Operator가 마감하지 않았어도 Closed다", async () => {
+    expect((await makePollPastClosingTime(db)).status).toBe("closed");
   });
 });

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/lib/db/db";
 import { createTestDb } from "@/lib/db/test-db";
 import { closePoll } from "./polls";
-import { makePoll, optionId } from "./test-fixtures";
+import { makePoll, makePollPastClosingTime, optionId } from "./test-fixtures";
 import { getResult } from "./results";
 import { castVote } from "./votes";
 
@@ -74,5 +74,11 @@ describe("getResult", () => {
         ],
       },
     });
+  });
+
+  test("Closing time이 지나면 Operator가 마감하지 않았어도 Voter가 Result를 본다", async () => {
+    const poll = await makePollPastClosingTime(db);
+
+    expect(await getResult(db, poll.id, "voter")).toMatchObject({ visibility: "visible", result: { totalVotes: 0 } });
   });
 });

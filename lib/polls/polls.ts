@@ -98,9 +98,15 @@ export async function createPoll(
   return { id };
 }
 
-/** Open Poll을 Closed로 바꾼다. 이미 Closed면 아무것도 바꾸지 않는다. 다시 여는 기능은 없다. */
+/**
+ * Open Poll을 지금 마감한다. 이미 Closed면(Closing time이 지난 경우 포함) 아무것도 바꾸지 않는다.
+ * 다시 열거나 Closing time을 늦추는 기능은 없다.
+ */
 export async function closePoll(db: Db, id: string): Promise<void> {
-  await db.query(`UPDATE polls SET status = 'closed', closed_at = now() WHERE id = $1 AND status = 'open'`, [id]);
+  await db.query(
+    `UPDATE polls SET status = 'closed', closed_at = now() WHERE id = $1 AND status = 'open' AND closes_at > now()`,
+    [id],
+  );
 }
 
 export async function getPoll(db: Db, id: string): Promise<Poll | null> {
@@ -112,7 +118,10 @@ export async function getPoll(db: Db, id: string): Promise<Poll | null> {
     status: PollStatus;
     closes_at: Date | string;
   }>(
-    `SELECT id, question, selection_mode, selection_limit, status, closes_at FROM polls WHERE id = $1`,
+    // ADR-0002: status 칸은 "Operator가 지금 마감했는지"만 뜻한다. Closing time이 지났으면 Closed다(DB 시각 기준).
+    `SELECT id, question, selection_mode, selection_limit, closes_at,
+            CASE WHEN status = 'closed' OR closes_at <= now() THEN 'closed' ELSE 'open' END AS status
+     FROM polls WHERE id = $1`,
     [id],
   );
   if (!poll) return null;

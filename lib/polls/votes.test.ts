@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import type { Db } from "@/lib/db/db";
 import { createTestDb } from "@/lib/db/test-db";
 import { closePoll } from "./polls";
-import { makePoll, optionId } from "./test-fixtures";
+import { makePoll, makePollPastClosingTime, optionId } from "./test-fixtures";
 import { getResult as viewResult } from "./results";
 import { castVote, type VoteRejectionReason } from "./votes";
 
@@ -91,6 +91,15 @@ describe("castVote on a Closed Poll", () => {
   test("Closed Poll에는 Vote할 수 없고, Result도 바뀌지 않는다", async () => {
     const poll = await makePoll(db, { options: ["가평", "양평"] });
     await closePoll(db, poll.id);
+
+    await expect(castVote(db, poll.id, [optionId(poll, "가평")])).rejects.toMatchObject(rejectedFor("poll-closed"));
+    expect((await getResult(poll.id)).totalVotes).toBe(0);
+  });
+});
+
+describe("castVote after the Closing time", () => {
+  test("Closing time이 지난 Poll에는 Vote할 수 없고, Result도 바뀌지 않는다", async () => {
+    const poll = await makePollPastClosingTime(db);
 
     await expect(castVote(db, poll.id, [optionId(poll, "가평")])).rejects.toMatchObject(rejectedFor("poll-closed"));
     expect((await getResult(poll.id)).totalVotes).toBe(0);

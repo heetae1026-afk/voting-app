@@ -19,4 +19,16 @@ export async function makePoll(db: Db, overrides: Partial<NewPoll> = {}): Promis
   return (await getPoll(db, id))!;
 }
 
+/**
+ * Closing time이 이미 지난 Poll을 만든다. createPoll에 과거의 "지금"(1시간 전)을 주고
+ * 그로부터 30분 뒤(= 지금부터 30분 전)를 Closing time으로 둔다. Operator가 마감하지는 않았다.
+ */
+export async function makePollPastClosingTime(db: Db, overrides: Partial<NewPoll> = {}): Promise<Poll> {
+  const now = Date.now();
+  const { id } = await createPoll(db, newPoll({ closesAt: new Date(now - 30 * 60 * 1000), ...overrides }), {
+    now: new Date(now - 60 * 60 * 1000),
+  });
+  return (await getPoll(db, id))!;
+}
+
 export const optionId = (poll: Poll, label: string) => poll.options.find((o) => o.label === label)!.id;
