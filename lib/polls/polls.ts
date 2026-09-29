@@ -80,6 +80,11 @@ export async function createPoll(db: Db, input: NewPoll): Promise<{ id: string }
   return { id };
 }
 
+/** Open Poll을 Closed로 바꾼다. 이미 Closed면 아무것도 바꾸지 않는다. 다시 여는 기능은 없다. */
+export async function closePoll(db: Db, id: string): Promise<void> {
+  await db.query(`UPDATE polls SET status = 'closed', closed_at = now() WHERE id = $1 AND status = 'open'`, [id]);
+}
+
 export async function getPoll(db: Db, id: string): Promise<Poll | null> {
   const [poll] = await db.query<{
     id: string;
