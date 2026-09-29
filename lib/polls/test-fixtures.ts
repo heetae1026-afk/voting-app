@@ -4,7 +4,13 @@ import { createPoll, getPoll, type NewPoll, type Poll } from "./polls";
 
 /** 규칙에 맞는 Poll 정의. 테스트가 관심 있는 항목만 덮어쓴다. */
 export function newPoll(overrides: Partial<NewPoll> = {}): NewPoll {
-  return { question: "테스트 질문", options: ["가평", "양평"], selectionMode: "single", ...overrides };
+  return {
+    question: "테스트 질문",
+    options: ["가평", "양평"],
+    selectionMode: "single",
+    closesAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    ...overrides,
+  };
 }
 
 /** Poll을 만들고, 만든 Poll을 읽어서 돌려준다. */

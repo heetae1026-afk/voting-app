@@ -10,6 +10,7 @@ export interface NewPoll {
   selectionMode: SelectionMode;
   /** Multiple일 때만 쓴다. Single이면 무시하고 1로 고정한다. */
   selectionLimit?: number;
+  closesAt: Date;
 }
 
 export interface Option {
@@ -23,15 +24,22 @@ export interface Poll {
   selectionMode: SelectionMode;
   selectionLimit: number;
   status: PollStatus;
+  closesAt: Date;
   options: Option[];
 }
+
+const MINUTE = 60 * 1000;
+/** Closing time은 만드는 시점부터 이 범위 안이어야 한다. */
+export const CLOSING_TIME_MIN_LEAD_MS = 10 * MINUTE;
+export const CLOSING_TIME_MAX_LEAD_MS = 30 * 24 * 60 * MINUTE;
 
 export type PollDefinitionReason =
   | "empty-question"
   | "too-few-options"
   | "empty-option"
   | "duplicate-option"
-  | "invalid-selection-limit";
+  | "invalid-selection-limit"
+  | "invalid-closing-time";
 
 /** Poll 정의가 규칙에 맞지 않아 만들 수 없을 때 던진다. */
 export class PollDefinitionError extends Error {
@@ -46,7 +54,12 @@ function newPollId(): string {
   return randomBytes(16).toString("base64url");
 }
 
-export async function createPoll(db: Db, input: NewPoll): Promise<{ id: string }> {
+export async function createPoll(
+  db: Db,
+  input: NewPoll,
+  /** now는 테스트에서 과거·미래 시점을 재현하려고 주입한다. 기본은 현재 시각. */
+  { now = new Date() }: { now?: Date } = {},
+): Promise<{ id: string }> {
   const question = input.question.trim();
   if (question === "") throw new PollDefinitionError("empty-question");
 
@@ -64,18 +77,23 @@ export async function createPoll(db: Db, input: NewPoll): Promise<{ id: string }
     throw new PollDefinitionError("invalid-selection-limit");
   }
 
+  const lead = input.closesAt.getTime() - now.getTime();
+  if (!(lead >= CLOSING_TIME_MIN_LEAD_MS && lead <= CLOSING_TIME_MAX_LEAD_MS)) {
+    throw new PollDefinitionError("invalid-closing-time");
+  }
+
   const id = newPollId();
   // Poll과 Option을 한 문장으로 넣어 원자적으로 만든다. Neon HTTP 드라이버는 대화형 트랜잭션이 없다.
   await db.query(
     `WITH p AS (
-       INSERT INTO polls (id, question, selection_mode, selection_limit)
-       VALUES ($1, $2, $3, $4)
+       INSERT INTO polls (id, question, selection_mode, selection_limit, closes_at)
+       VALUES ($1, $2, $3, $4, $6)
        RETURNING id
      )
      INSERT INTO options (poll_id, label, position)
      SELECT p.id, o.label, o.ord - 1
      FROM p, unnest($5::text[]) WITH ORDINALITY AS o (label, ord)`,
-    [id, question, input.selectionMode, selectionLimit, options],
+    [id, question, input.selectionMode, selectionLimit, options, input.closesAt],
   );
   return { id };
 }
@@ -92,8 +110,9 @@ export async function getPoll(db: Db, id: string): Promise<Poll | null> {
     selection_mode: SelectionMode;
     selection_limit: number;
     status: PollStatus;
+    closes_at: Date | string;
   }>(
-    `SELECT id, question, selection_mode, selection_limit, status FROM polls WHERE id = $1`,
+    `SELECT id, question, selection_mode, selection_limit, status, closes_at FROM polls WHERE id = $1`,
     [id],
   );
   if (!poll) return null;
@@ -109,6 +128,8 @@ export async function getPoll(db: Db, id: string): Promise<Poll | null> {
     selectionMode: poll.selection_mode,
     selectionLimit: poll.selection_limit,
     status: poll.status,
+    // 드라이버에 따라 Date 또는 문자열로 온다.
+    closesAt: new Date(poll.closes_at),
     options,
   };
 }

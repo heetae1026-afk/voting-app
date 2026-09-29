@@ -87,6 +87,35 @@ describe("createPoll", () => {
   });
 });
 
+describe("createPoll: Closing time", () => {
+  const now = new Date("2026-09-30T09:00:00Z");
+
+  test("만든 Poll은 정한 Closing time을 가진다", async () => {
+    const closesAt = new Date("2026-10-03T09:00:00Z");
+    const { id } = await createPoll(db, newPoll({ closesAt }), { now });
+
+    expect((await getPoll(db, id))?.closesAt).toEqual(closesAt);
+  });
+
+  test.each([
+    { closesAt: new Date("2026-09-30T08:00:00Z"), why: "이미 지난 시각" },
+    { closesAt: new Date("2026-09-30T09:09:59Z"), why: "10분보다 가까움" },
+    { closesAt: new Date("2026-10-30T09:00:01Z"), why: "30일보다 멂" },
+    { closesAt: new Date("not a date"), why: "잘못된 날짜" },
+  ])("Closing time이 허용 범위 밖이면 만들 수 없다: $why", async ({ closesAt }) => {
+    await expect(createPoll(db, newPoll({ closesAt }), { now })).rejects.toMatchObject(
+      rejectedFor("invalid-closing-time"),
+    );
+  });
+
+  test.each([
+    { closesAt: new Date("2026-09-30T09:10:00Z"), why: "정확히 10분 뒤" },
+    { closesAt: new Date("2026-10-30T09:00:00Z"), why: "정확히 30일 뒤" },
+  ])("Closing time이 경계값이면 만들 수 있다: $why", async ({ closesAt }) => {
+    await expect(createPoll(db, newPoll({ closesAt }), { now })).resolves.toHaveProperty("id");
+  });
+});
+
 describe("getPoll", () => {
   test("없는 Poll ID면 null을 돌려준다", async () => {
     expect(await getPoll(db, "no-such-poll")).toBeNull();
